@@ -1,0 +1,20 @@
+send.js
+  s_efe2cfbf0b89f1::t_37c585e314beb4 121-129
+  s_efe2cfbf0b89f1::t_f781c1234d3fe3 148-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d4739417d2daffad5499312592506f170919f1de",
+  "prompts": {},
+  "sessions": {
+    "s_efe2cfbf0b89f1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2abb1ec-f942-4fac-ba6e-4dc3c5628aad",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Himanshu Mishra <himanshu22500@gmail.com>"
+    }
+  }
+}
