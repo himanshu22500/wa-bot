@@ -51,6 +51,35 @@ function toChatId(raw) {
   return `${digits}@c.us`;
 }
 
+// sendMessage() resolves when the message is QUEUED locally, not when WhatsApp's
+// servers accept it. If we exit before that, the message is silently dropped.
+// Wait until the message ack reaches at least SERVER (1) before continuing.
+// Ack levels: -1 ERROR, 0 PENDING, 1 SERVER, 2 DEVICE, 3 READ.
+function waitForServerAck(client, msg, timeoutMs) {
+  const targetId = msg.id && msg.id._serialized;
+  return new Promise((resolve) => {
+    if (typeof msg.ack === 'number' && msg.ack >= 1) return resolve(true);
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      clearInterval(poller);
+      client.removeListener('message_ack', onAck);
+      resolve(ok);
+    };
+    const onAck = (m) => {
+      if (m && m.id && m.id._serialized === targetId && m.ack >= 1) finish(true);
+    };
+    client.on('message_ack', onAck);
+    // Fallback poll in case the event is missed.
+    const poller = setInterval(() => {
+      if (typeof msg.ack === 'number' && msg.ack >= 1) finish(true);
+    }, 1000);
+    const timer = setTimeout(() => finish(typeof msg.ack === 'number' && msg.ack >= 1), timeoutMs);
+  });
+}
+
 // --- Main -----------------------------------------------------------------
 const cfg = loadConfig();
 
@@ -89,6 +118,15 @@ client.on('ready', async () => {
     process.exit(0);
   }
 
+  // 'ready' can fire before the WhatsApp socket is fully CONNECTED; sending too
+  // early is what gets messages stuck at PENDING. Wait briefly for CONNECTED.
+  for (let i = 0; i < 15; i++) {
+    let state;
+    try { state = await client.getState(); } catch (_) { state = null; }
+    if (state === 'CONNECTED') break;
+    await sleep(1000);
+  }
+
   let sent = 0;
   let failed = 0;
 
@@ -107,9 +145,15 @@ client.on('ready', async () => {
         sent++;
         continue;
       }
-      await client.sendMessage(info._serialized || chatId, cfg.message);
-      console.log(`${stamp()} Sent to ${num}`);
-      sent++;
+      const msg = await client.sendMessage(info._serialized || chatId, cfg.message);
+      const acked = await waitForServerAck(client, msg, 60000);
+      if (acked) {
+        console.log(`${stamp()} Sent to ${num} (server-acked, ack=${msg.ack})`);
+        sent++;
+      } else {
+        console.error(`${stamp()} Queued but NOT confirmed delivered to ${num} (ack=${msg.ack}) — treating as failure`);
+        failed++;
+      }
     } catch (err) {
       console.error(`${stamp()} Failed to send to ${num}: ${err.message}`);
       failed++;
