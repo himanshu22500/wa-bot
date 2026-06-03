@@ -55,28 +55,35 @@ function toChatId(raw) {
 // servers accept it. If we exit before that, the message is silently dropped.
 // Wait until the message ack reaches at least SERVER (1) before continuing.
 // Ack levels: -1 ERROR, 0 PENDING, 1 SERVER, 2 DEVICE, 3 READ.
+// Resolves with the highest ack level observed (>=1 means WhatsApp's servers
+// accepted it). The message_ack event delivers a fresh object — the original
+// msg.ack does not auto-update — so we track the level from the event.
 function waitForServerAck(client, msg, timeoutMs) {
   const targetId = msg.id && msg.id._serialized;
   return new Promise((resolve) => {
-    if (typeof msg.ack === 'number' && msg.ack >= 1) return resolve(true);
+    let lastAck = typeof msg.ack === 'number' ? msg.ack : 0;
     let done = false;
-    const finish = (ok) => {
+    const finish = (ack) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       clearInterval(poller);
       client.removeListener('message_ack', onAck);
-      resolve(ok);
+      resolve(ack);
     };
+    if (lastAck >= 1) return finish(lastAck);
     const onAck = (m) => {
-      if (m && m.id && m.id._serialized === targetId && m.ack >= 1) finish(true);
+      if (m && m.id && m.id._serialized === targetId) {
+        lastAck = m.ack;
+        if (m.ack >= 1) finish(m.ack);
+      }
     };
     client.on('message_ack', onAck);
     // Fallback poll in case the event is missed.
     const poller = setInterval(() => {
-      if (typeof msg.ack === 'number' && msg.ack >= 1) finish(true);
+      if (typeof msg.ack === 'number' && msg.ack >= 1) finish(msg.ack);
     }, 1000);
-    const timer = setTimeout(() => finish(typeof msg.ack === 'number' && msg.ack >= 1), timeoutMs);
+    const timer = setTimeout(() => finish(lastAck), timeoutMs);
   });
 }
 
@@ -146,12 +153,12 @@ client.on('ready', async () => {
         continue;
       }
       const msg = await client.sendMessage(info._serialized || chatId, cfg.message);
-      const acked = await waitForServerAck(client, msg, 60000);
-      if (acked) {
-        console.log(`${stamp()} Sent to ${num} (server-acked, ack=${msg.ack})`);
+      const ack = await waitForServerAck(client, msg, 60000);
+      if (ack >= 1) {
+        console.log(`${stamp()} Sent to ${num} (delivered to server, ack=${ack})`);
         sent++;
       } else {
-        console.error(`${stamp()} Queued but NOT confirmed delivered to ${num} (ack=${msg.ack}) — treating as failure`);
+        console.error(`${stamp()} Queued but NOT confirmed delivered to ${num} (ack=${ack}) — treating as failure`);
         failed++;
       }
     } catch (err) {
