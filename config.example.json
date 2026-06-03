@@ -1,0 +1,8 @@
+{
+  "recipients": [
+    "919876543210",
+    "919812345678"
+  ],
+  "message": "Good evening! 🌙",
+  "delayBetweenMessagesMs": 4000
+}

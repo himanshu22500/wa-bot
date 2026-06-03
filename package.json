@@ -1,0 +1,16 @@
+{
+  "name": "wa-bot",
+  "version": "1.0.0",
+  "description": "Send a scheduled daily WhatsApp message to a fixed list of contacts",
+  "main": "send.js",
+  "type": "commonjs",
+  "scripts": {
+    "login": "node send.js --login",
+    "send": "node send.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

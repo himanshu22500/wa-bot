@@ -1,0 +1,12 @@
+[Unit]
+Description=wa-bot: send the current greeting on boot, then stop the instance
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/home/ubuntu/wa-bot/boot-send.sh
+
+[Install]
+WantedBy=multi-user.target

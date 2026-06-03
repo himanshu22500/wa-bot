@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# WhatsApp session — THIS IS ACCOUNT CREDENTIALS. Never commit.
+.wwebjs_auth/
+.wwebjs_cache/
+
+# private / host-local config
+.env
+config.json
+
+# runtime markers & logs
+DRY_RUN
+log.txt
+*.log
